@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-900 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Goal Counter & Reminder</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Canvas Confetti CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Font (Inter) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    keyframes: {
+                        pulseGlow: {
+                            '0%, 100%': { boxShadow: '0 0 15px rgba(99, 102, 241, 0.4)' },
+                            '50%': { boxShadow: '0 0 30px rgba(99, 102, 241, 0.8)' },
+                        },
+                        bounceMild: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-6px)' }
+                        }
+                    },
+                    animation: {
+                        'pulse-glow': 'pulseGlow 2s infinite',
+                        'bounce-mild': 'bounceMild 2s infinite',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbar & smooth scale transitions */
+        .btn-press {
+            transition: transform 0.08s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+        }
+        .btn-press:active {
+            transform: scale(0.93) !important;
+        }
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col justify-between font-sans antialiased bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 min-h-screen text-slate-100 selection:bg-indigo-500 selection:text-white">
+
+    <!-- Header Navigation -->
+    <header class="w-full max-w-4xl mx-auto p-4 md:p-6 flex justify-between items-center">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-indigo-400 font-bold text-xl shadow-lg shadow-indigo-950">
+                <i class="fa-solid fa-arrow-trend-up"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-lg md:text-xl tracking-tight text-white">Target Pulse</h1>
+                <p class="text-xs text-slate-400">Click Counter & Smart Reminder</p>
+            </div>
+        </div>
+        
+        <button id="toggle-settings-btn" class="btn-press flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 text-slate-300 text-sm font-medium transition shadow-sm">
+            <i class="fa-solid fa-sliders text-indigo-400"></i>
+            <span class="hidden sm:inline">Configure</span>
+        </button>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="w-full max-w-xl mx-auto px-4 py-2 flex-grow flex flex-col justify-center items-center">
+
+        <!-- Settings Drawer / Panel (Collapsible) -->
+        <section id="settings-panel" class="w-full mb-6 glass-panel rounded-2xl p-5 shadow-2xl transition-all duration-300 hidden transform origin-top">
+            <div class="flex items-center justify-between border-b border-slate-700/60 pb-3 mb-4">
+                <h2 class="font-semibold text-slate-200 flex items-center gap-2 text-sm uppercase tracking-wider">
+                    <i class="fa-solid fa-gear text-indigo-400"></i> Counter Configuration
+                </h2>
+                <span class="text-xs text-slate-400">Auto-saved</span>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label for="target-input" class="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider">
+                        Target Threshold (X)
+                    </label>
+                    <div class="relative">
+                        <input type="number" id="target-input" min="1" max="99999" value="10" 
+                               class="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl px-4 py-2.5 text-slate-100 font-semibold focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition">
+                        <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-500 text-xs">
+                            counts
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="reminder-input" class="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider">
+                        Target Reminder Message
+                    </label>
+                    <input type="text" id="reminder-input" value="Take a quick break, drink water, and stretch!" 
+                           placeholder="Enter a 1-sentence reminder..." 
+                           class="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl px-4 py-2.5 text-slate-100 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition">
+                </div>
+
+                <div class="pt-2 flex justify-end gap-2">
+                    <button id="close-settings-btn" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs uppercase tracking-wider shadow-md transition">
+                        Apply & Close
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Counter Display Card -->
+        <div id="counter-card" class="w-full glass-panel rounded-3xl p-6 md:p-8 shadow-2xl flex flex-col items-center relative overflow-hidden transition-all duration-300">
+            
+            <!-- Progress Bar Top Accent -->
+            <div class="absolute top-0 left-0 right-0 h-1.5 bg-slate-800">
+                <div id="progress-bar" class="h-full bg-gradient-to-r from-indigo-500 to-cyan-400 transition-all duration-300 w-0"></div>
+            </div>
+
+            <!-- Target Indicator Badge -->
+            <div class="mb-4 flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-950/80 border border-indigo-800/50 text-indigo-300 text-xs font-medium tracking-wide">
+                <span>Interval: <strong id="target-display" class="text-indigo-200">10</strong></span>
+                <span class="text-indigo-500">•</span>
+                <span>Next Goal: <strong id="next-goal-display" class="text-indigo-200">10</strong></span>
+                <span class="text-indigo-500">•</span>
+                <span id="percent-display">0%</span>
+            </div>
+
+            <!-- Number Counter Screen -->
+            <div class="my-4 md:my-6 relative flex items-center justify-center">
+                <div id="count-number" class="text-7xl md:text-9xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-white via-slate-100 to-slate-400 select-none transition-all duration-150 transform scale-100">
+                    0
+                </div>
+            </div>
+
+            <!-- Main Interactive Controls (- / +) -->
+            <div class="w-full grid grid-cols-2 gap-4 mt-2 mb-4">
+                <button id="decrement-btn" aria-label="Decrement counter" 
+                        class="btn-press py-5 md:py-6 rounded-2xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 text-slate-200 hover:text-white flex flex-col items-center justify-center shadow-lg group">
+                    <i class="fa-solid fa-minus text-2xl md:text-3xl text-slate-400 group-hover:text-slate-200 transition"></i>
+                    <span class="text-[10px] uppercase tracking-wider text-slate-400 mt-1 font-semibold">Subtract [ - ]</span>
+                </button>
+
+                <button id="increment-btn" aria-label="Increment counter" 
+                        class="btn-press py-5 md:py-6 rounded-2xl bg-indigo-600 hover:bg-indigo-500 border border-indigo-400/30 text-white flex flex-col items-center justify-center shadow-lg shadow-indigo-950 group">
+                    <i class="fa-solid fa-plus text-2xl md:text-3xl text-indigo-100 group-hover:scale-110 transition"></i>
+                    <span class="text-[10px] uppercase tracking-wider text-indigo-200/90 mt-1 font-semibold">Add [ + / Space ]</span>
+                </button>
+            </div>
+
+            <!-- Secondary Actions: Quick Reset & Keyboard Hint -->
+            <div class="w-full flex justify-between items-center pt-2 text-xs text-slate-400">
+                <button id="quick-reset-btn" class="hover:text-rose-400 transition flex items-center gap-1.5 py-1 px-2 rounded-lg hover:bg-slate-800/60">
+                    <i class="fa-solid fa-rotate-left"></i> Reset Count
+                </button>
+                <span class="hidden sm:inline text-slate-500 text-[11px]"><i class="fa-keyboard font-normal"></i> Use Arrow Keys</span>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="w-full max-w-4xl mx-auto p-4 text-center text-xs text-slate-500">
+        Interactive Goal Counter • Built with Plain JavaScript & Tailwind CSS
+    </footer>
+
+    <!-- Target Reached Modal / Celebration Alert -->
+    <div id="target-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300">
+        <div id="modal-card" class="bg-slate-900 border border-indigo-500/40 rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl text-center transform scale-90 transition-all duration-300 relative overflow-hidden">
+            
+            <!-- Radial background glow -->
+            <div class="absolute -top-12 left-1/2 -translate-x-1/2 w-48 h-48 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none"></div>
+
+            <!-- Trophy / Goal Icon -->
+            <div class="w-20 h-20 bg-gradient-to-tr from-amber-500 to-yellow-300 rounded-2xl mx-auto flex items-center justify-center text-slate-950 text-4xl shadow-xl shadow-amber-500/20 mb-5 animate-bounce-mild">
+                <i class="fa-solid fa-trophy"></i>
+            </div>
+
+            <h3 class="text-2xl font-extrabold text-white mb-1">Goal Reached!</h3>
+            <p id="modal-count-info" class="text-xs uppercase tracking-widest text-indigo-400 font-semibold mb-4">
+                Target of 10 reached
+            </p>
+
+            <!-- Custom One-Sentence Reminder Callout -->
+            <div class="bg-slate-800/90 border border-slate-700 rounded-2xl p-4 my-4 text-slate-200 text-sm md:text-base leading-relaxed font-medium shadow-inner">
+                <i class="fa-solid fa-quote-left text-indigo-400 text-xs mr-1 opacity-60"></i>
+                <span id="modal-reminder-text">Take a quick break, drink water, and stretch!</span>
+                <i class="fa-solid fa-quote-right text-indigo-400 text-xs ml-1 opacity-60"></i>
+            </div>
+
+            <!-- Modal Action Buttons -->
+            <div class="mt-6 flex flex-col gap-2.5">
+                <button id="keep-going-btn" class="btn-press w-full py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm shadow-lg shadow-indigo-950 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-arrow-right"></i> Continue Counting
+                </button>
+                <button id="reset-counter-btn" class="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-rotate-left"></i> Reset Counter to 0
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // State Management
+            let count = 0;
+            let targetX = 10;
+            let reminderMessage = "Take a quick break, drink water, and stretch!";
+            let lastTriggeredMilestone = 0;
+
+            // DOM Element References
+            const countDisplay = document.getElementById('count-number');
+            const targetDisplay = document.getElementById('target-display');
+            const nextGoalDisplay = document.getElementById('next-goal-display');
+            const percentDisplay = document.getElementById('percent-display');
+            const progressBar = document.getElementById('progress-bar');
+            const counterCard = document.getElementById('counter-card');
+
+            const incrementBtn = document.getElementById('increment-btn');
+            const decrementBtn = document.getElementById('decrement-btn');
+            const quickResetBtn = document.getElementById('quick-reset-btn');
+
+            const toggleSettingsBtn = document.getElementById('toggle-settings-btn');
+            const closeSettingsBtn = document.getElementById('close-settings-btn');
+            const settingsPanel = document.getElementById('settings-panel');
+            const targetInput = document.getElementById('target-input');
+            const reminderInput = document.getElementById('reminder-input');
+
+            const targetModal = document.getElementById('target-modal');
+            const modalCard = document.getElementById('modal-card');
+            const modalCountInfo = document.getElementById('modal-count-info');
+            const modalReminderText = document.getElementById('modal-reminder-text');
+            const resetCounterBtn = document.getElementById('reset-counter-btn');
+            const keepGoingBtn = document.getElementById('keep-going-btn');
+
+            // Load saved state from LocalStorage if available
+            function loadSavedSettings() {
+                const savedTarget = localStorage.getItem('pulse_target');
+                const savedReminder = localStorage.getItem('pulse_reminder');
+                const savedCount = localStorage.getItem('pulse_count');
+                const savedMilestone = localStorage.getItem('pulse_last_milestone');
+
+                if (savedTarget !== null && !isNaN(parseInt(savedTarget))) {
+                    targetX = Math.max(1, parseInt(savedTarget));
+                    targetInput.value = targetX;
+                }
+                if (savedReminder !== null && savedReminder.trim() !== '') {
+                    reminderMessage = savedReminder;
+                    reminderInput.value = reminderMessage;
+                }
+                if (savedCount !== null && !isNaN(parseInt(savedCount))) {
+                    count = Math.max(0, parseInt(savedCount));
+                }
+                if (savedMilestone !== null && !isNaN(parseInt(savedMilestone))) {
+                    lastTriggeredMilestone = Math.max(0, parseInt(savedMilestone));
+                } else if (count > 0) {
+                    lastTriggeredMilestone = Math.floor(count / targetX) * targetX;
+                }
+                updateUI();
+            }
+
+            // Save settings to LocalStorage
+            function saveSettings() {
+                const parsedTarget = parseInt(targetInput.value);
+                targetX = (!isNaN(parsedTarget) && parsedTarget > 0) ? parsedTarget : 10;
+                targetInput.value = targetX;
+
+                reminderMessage = reminderInput.value.trim() || "Great job reaching your target!";
+                reminderInput.value = reminderMessage;
+
+                localStorage.setItem('pulse_target', targetX);
+                localStorage.setItem('pulse_reminder', reminderMessage);
+
+                // Align milestone tracker with new target interval
+                lastTriggeredMilestone = Math.floor(count / targetX) * targetX;
+                localStorage.setItem('pulse_last_milestone', lastTriggeredMilestone);
+
+                updateUI();
+            }
+
+            // Audio Feedback (Web Audio API - Synthesized without external files)
+            function playSound(type) {
+                try {
+                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+
+                    if (type === 'increment') {
+                        osc.frequency.setValueAtTime(320, ctx.currentTime);
+                        osc.frequency.exponentialRampToValueAtTime(520, ctx.currentTime + 0.08);
+                        gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.08);
+                        osc.start();
+                        osc.stop(ctx.currentTime + 0.08);
+                    } else if (type === 'decrement') {
+                        osc.frequency.setValueAtTime(400, ctx.currentTime);
+                        osc.frequency.exponentialRampToValueAtTime(250, ctx.currentTime + 0.08);
+                        gain.gain.setValueAtTime(0.12, ctx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.08);
+                        osc.start();
+                        osc.stop(ctx.currentTime + 0.08);
+                    } else if (type === 'goal') {
+                        const now = ctx.currentTime;
+                        [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+                            const o = ctx.createOscillator();
+                            const g = ctx.createGain();
+                            o.type = 'triangle';
+                            o.frequency.value = freq;
+                            o.connect(g);
+                            g.connect(ctx.destination);
+                            g.gain.setValueAtTime(0.1, now + i * 0.06);
+                            g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.06 + 0.4);
+                            o.start(now + i * 0.06);
+                            o.stop(now + i * 0.06 + 0.4);
+                        });
+                    }
+                } catch(e) {
+                    // Audio context blocked or not supported
+                }
+            }
+
+            // Trigger Fireworks / Confetti Effect
+            function launchConfetti() {
+                if (typeof confetti === 'function') {
+                    confetti({
+                        particleCount: 80,
+                        spread: 70,
+                        origin: { y: 0.6 },
+                        colors: ['#6366f1', '#38bdf8', '#f59e0b', '#10b981']
+                    });
+                }
+            }
+
+            // Update UI State
+            function updateUI() {
+                // Update text displays
+                countDisplay.textContent = count;
+                targetDisplay.textContent = targetX;
+
+                // Calculate progress relative to current interval (next multiple of X)
+                const currentRemainder = count % targetX;
+                const nextGoal = count > 0 && currentRemainder === 0 ? count : (Math.floor(count / targetX) + 1) * targetX;
+                nextGoalDisplay.textContent = nextGoal;
+
+                // Percentage towards the next multiple of X
+                let percentage = 0;
+                if (count > 0 && currentRemainder === 0) {
+                    percentage = 100;
+                } else {
+                    percentage = Math.round((currentRemainder / targetX) * 100);
+                }
+
+                percentDisplay.textContent = `${percentage}%`;
+                
+                const progressWidth = percentage;
+                progressBar.style.width = `${progressWidth}%`;
+
+                // Save count and milestone state
+                localStorage.setItem('pulse_count', count);
+                localStorage.setItem('pulse_last_milestone', lastTriggeredMilestone);
+
+                // Highlight progress bar when exact multiple is hit
+                if (count > 0 && currentRemainder === 0) {
+                    progressBar.classList.remove('from-indigo-500', 'to-cyan-400');
+                    progressBar.classList.add('from-emerald-400', 'to-teal-300');
+                    counterCard.classList.add('ring-2', 'ring-indigo-500/50');
+                } else {
+                    progressBar.classList.remove('from-emerald-400', 'to-teal-300');
+                    progressBar.classList.add('from-indigo-500', 'to-cyan-400');
+                    counterCard.classList.remove('ring-2', 'ring-indigo-500/50');
+                }
+
+                // Animate count change
+                countDisplay.classList.remove('scale-110');
+                void countDisplay.offsetWidth; // Force reflow
+                countDisplay.classList.add('scale-110');
+                setTimeout(() => countDisplay.classList.remove('scale-110'), 120);
+            }
+
+            // Check if Goal Target / Multiple is reached
+            function checkTargetReached() {
+                if (count > 0 && count % targetX === 0 && count > lastTriggeredMilestone) {
+                    lastTriggeredMilestone = count;
+                    showGoalModal();
+                }
+            }
+
+            // Increment Function
+            function increment() {
+                count++;
+                playSound('increment');
+                updateUI();
+                checkTargetReached();
+            }
+
+            // Decrement Function (Min bound: 0)
+            function decrement() {
+                if (count > 0) {
+                    count--;
+                    playSound('decrement');
+                    // Reset milestone trigger if stepping back below current multiple
+                    if (count < lastTriggeredMilestone) {
+                        lastTriggeredMilestone = Math.floor(count / targetX) * targetX;
+                    }
+                    updateUI();
+                }
+            }
+
+            // Reset Function
+            function resetCounter() {
+                count = 0;
+                lastTriggeredMilestone = 0;
+                playSound('decrement');
+                updateUI();
+                hideGoalModal();
+            }
+
+            // Modal Controls
+            function showGoalModal() {
+                playSound('goal');
+                launchConfetti();
+
+                const milestoneNumber = count / targetX;
+                modalCountInfo.textContent = `Goal Reached! (Count: ${count} • Milestone #${milestoneNumber})`;
+                modalReminderText.textContent = reminderMessage;
+
+                targetModal.classList.remove('opacity-0', 'pointer-events-none');
+                targetModal.classList.add('opacity-100');
+                modalCard.classList.remove('scale-90');
+                modalCard.classList.add('scale-100');
+            }
+
+            function hideGoalModal() {
+                targetModal.classList.remove('opacity-100');
+                targetModal.classList.add('opacity-0', 'pointer-events-none');
+                modalCard.classList.remove('scale-100');
+                modalCard.classList.add('scale-90');
+            }
+
+            // Settings Drawer Toggle
+            function toggleSettings() {
+                if (settingsPanel.classList.contains('hidden')) {
+                    settingsPanel.classList.remove('hidden');
+                } else {
+                    saveSettings();
+                    settingsPanel.classList.add('hidden');
+                }
+            }
+
+            // Event Listeners
+            incrementBtn.addEventListener('click', increment);
+            decrementBtn.addEventListener('click', decrement);
+            quickResetBtn.addEventListener('click', resetCounter);
+            resetCounterBtn.addEventListener('click', resetCounter);
+            keepGoingBtn.addEventListener('click', hideGoalModal);
+
+            toggleSettingsBtn.addEventListener('click', toggleSettings);
+            closeSettingsBtn.addEventListener('click', () => {
+                saveSettings();
+                settingsPanel.classList.add('hidden');
+            });
+
+            // Save settings when input values change
+            targetInput.addEventListener('change', saveSettings);
+            reminderInput.addEventListener('change', saveSettings);
+
+            // Keyboard Shortcuts Support
+            document.addEventListener('keydown', (e) => {
+                // Ignore key events if typing inside input fields
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+                if (e.key === 'ArrowUp' || e.key === '+' || e.key === ' ') {
+                    e.preventDefault();
+                    increment();
+                } else if (e.key === 'ArrowDown' || e.key === '-') {
+                    e.preventDefault();
+                    decrement();
+                } else if (e.key === 'r' || e.key === 'R') {
+                    resetCounter();
+                } else if (e.key === 'Escape') {
+                    hideGoalModal();
+                    settingsPanel.classList.add('hidden');
+                }
+            });
+
+            // Initial Setup
+            loadSavedSettings();
+        });
+    </script>
+</body>
+</html>
